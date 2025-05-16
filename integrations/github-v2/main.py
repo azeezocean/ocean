@@ -1,13 +1,12 @@
 import typing
 from loguru import logger
-from github.core.exporters.workflows_exporter import WorkflowExporter
-from integration import GithubRepositoryConfig, GithubWorkflowConfig
 from port_ocean.context.event import event
 from port_ocean.context.ocean import ocean
 from port_ocean.core.ocean_types import ASYNC_GENERATOR_RESYNC_TYPE
 from port_ocean.utils.async_iterators import stream_async_iterators_tasks
 
 
+from integration import GithubRepositoryConfig, GithubWorkflowConfig
 from github.clients.client_factory import create_github_client
 from github.utils import ObjectKind
 from github.webhook.events import WEBHOOK_CREATE_EVENTS
@@ -17,6 +16,7 @@ from github.webhook.webhook_processors.repository_webhook_processor import (
 from github.webhook.webhook_client import GithubWebhookClient
 from github.core.exporters.repository_exporter import RepositoryExporter
 from github.core.options import ListRepositoryOptions
+from github.core.exporters.workflows_exporter import WorkflowExporter
 
 
 @ocean.on_start()
