@@ -18,13 +18,25 @@ class GithubRepositorySelector(Selector):
     )
 
 
+class GithubWorkflowSelector(Selector):
+    repo_type: RepositoryType = Field(
+        default=RepositoryType.ALL,
+        description="Filter by repository relationship (e.g., private, public)",
+    )
+
+
 class GithubRepositoryConfig(ResourceConfig):
     selector: GithubRepositorySelector
     kind: Literal["repository"]
 
 
+class GithubWorkflowConfig(ResourceConfig):
+    selector: GithubWorkflowSelector
+    kind: Literal["workflow"]
+
+
 class GithubPortAppConfig(PortAppConfig):
-    resources: list[GithubRepositoryConfig | ResourceConfig]
+    resources: list[GithubRepositoryConfig | GithubWorkflowConfig | ResourceConfig]
 
 
 class GithubIntegration(BaseIntegration):

@@ -3,7 +3,7 @@ createMissingRelatedEntities: true
 resources:
   - kind: repository
     selector:
-      query: 'true'
+      query: "true"
       type: "all"
     port:
       entity:
@@ -17,3 +17,20 @@ resources:
             defaultBranch: .default_branch
             url: .html_url
             language: .language
+  - kind: workflow
+    selector:
+      query: "true" # JQ boolean query. If evaluated to false - skip syncing the object.
+    port:
+      entity:
+        mappings:
+          identifier: ".repo + (.id|tostring)"
+          title: ".name"
+          blueprint: '"githubWorkflow"'
+          properties:
+            path: ".path"
+            status: ".state"
+            createdAt: ".created_at"
+            updatedAt: ".updated_at"
+            link: ".html_url"
+          relations:
+            repository: ".repo"
