@@ -35,8 +35,18 @@ class GithubWorkflowConfig(ResourceConfig):
     kind: Literal["workflow"]
 
 
+class GithubWorkflowRunConfig(ResourceConfig):
+    selector: GithubWorkflowSelector
+    kind: Literal["workflow-run"]
+
+
 class GithubPortAppConfig(PortAppConfig):
-    resources: list[GithubRepositoryConfig | GithubWorkflowConfig | ResourceConfig]
+    resources: list[
+        GithubRepositoryConfig
+        | GithubWorkflowConfig
+        | GithubWorkflowRunConfig
+        | ResourceConfig
+    ]
 
 
 class GithubIntegration(BaseIntegration):
