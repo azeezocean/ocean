@@ -2,13 +2,12 @@ from typing import Any, AsyncGenerator
 import pytest
 from unittest.mock import patch, MagicMock
 import httpx
-from github.core.exporters.repository_exporter import (
-    RepositoryExporter,
-    RepositoryExporterOptions,
-)
+from github.core.exporters.repository_exporter import RepositoryExporter
 from github.clients.base_client import AbstractGithubClient
 from github.utils import RepositoryType
 from port_ocean.context.event import event_context
+from github.core.options import SingleRepositoryOptions, ListRepositoryOptions
+
 
 TEST_REPOS = [
     {"id": 1, "name": "repo1", "full_name": "test-org/repo1"},
@@ -30,14 +29,14 @@ class TestRepositoryExporter:
         with patch.object(
             client, "send_api_request", return_value=mock_response
         ) as mock_request:
-            repo = await exporter.get_resource("repo1")
+            repo = await exporter.get_resource(SingleRepositoryOptions(name="repo1"))
 
             assert repo == TEST_REPOS[0]
 
             mock_request.assert_called_once_with(f"repos/{client.organization}/repo1")
 
     async def test_get_paginated_resources(self, client: AbstractGithubClient) -> None:
-        options = RepositoryExporterOptions(type=RepositoryType.ALL)
+        options = ListRepositoryOptions(type=RepositoryType.ALL)
         exporter = RepositoryExporter(client)
 
         # Create an async mock to return the test repos

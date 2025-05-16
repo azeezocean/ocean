@@ -13,10 +13,8 @@ from github.webhook.webhook_processors.repository_webhook_processor import (
     RepositoryWebhookProcessor,
 )
 from github.webhook.webhook_client import GithubWebhookClient
-from github.core.exporters.repository_exporter import (
-    RepositoryExporter,
-    RepositoryExporterOptions,
-)
+from github.core.exporters.repository_exporter import RepositoryExporter
+from github.core.options import ListRepositoryOptions
 
 
 @ocean.on_start()
@@ -52,7 +50,7 @@ async def resync_repositories(kind: str) -> ASYNC_GENERATOR_RESYNC_TYPE:
     exporter = RepositoryExporter(client)
 
     config = typing.cast(GithubRepositoryConfig, event.resource_config)
-    options = RepositoryExporterOptions(type=config.selector.type)
+    options = ListRepositoryOptions(type=config.selector.type)
 
     async for repositories in exporter.get_paginated_resources(options=options):
         yield repositories
