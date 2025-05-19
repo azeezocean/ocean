@@ -4,10 +4,11 @@ REPOSITORY_UPSERT_EVENTS = [
     "edited",
     "renamed",
     "transferred",
-    "archived",
     "unarchived",
+    "publicized",
+    "privatized",
 ]
-REPOSITORY_DELETE_EVENTS = ["deleted"]
+REPOSITORY_DELETE_EVENTS = ["archived", "deleted"]
 
 WORKFLOW_UPSERT_EVENTS = ["in_progress", "requested"]
 WORKFLOW_DELETE_EVENTS = ["completed"]
