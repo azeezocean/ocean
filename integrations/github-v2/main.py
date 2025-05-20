@@ -46,7 +46,7 @@ async def resync_repositories(kind: str) -> ASYNC_GENERATOR_RESYNC_TYPE:
     """Resync all repositories in the organization."""
     logger.info(f"Starting resync for kind: {kind}")
 
-    client = create_github_client()
+    client = await create_github_client()
     exporter = RepositoryExporter(client)
 
     config = typing.cast(GithubRepositoryConfig, event.resource_config)

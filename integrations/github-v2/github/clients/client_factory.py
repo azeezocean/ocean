@@ -1,3 +1,6 @@
+import base64
+
+from github.clients.app_client import GithubAppRestClient
 from github.clients.rest_client import GithubRestClient
 from github.clients.base_client import AbstractGithubClient
 from port_ocean.context.ocean import ocean
@@ -13,7 +16,7 @@ class GithubClientFactory:
             cls._instance = super(GithubClientFactory, cls).__new__(cls)
         return cls._instance
 
-    def get_client(self, client_type: str) -> AbstractGithubClient:
+    async def get_client(self, client_type: str) -> AbstractGithubClient:
         """Get or create a client instance from Ocean configuration.
 
         Args:
@@ -25,19 +28,46 @@ class GithubClientFactory:
         Raises:
             ValueError: If client_type is invalid
         """
-        if client_type not in self._clients:
-            if client_type == "rest":
-                self._clients[client_type] = GithubRestClient(
-                    token=ocean.integration_config["github_token"],
-                    organization=ocean.integration_config["github_organization"],
-                    github_host=ocean.integration_config["github_host"],
+        token = ocean.integration_config.get("github_token")
+        app_id = ocean.integration_config.get("app_id")
+        app_private_key = ocean.integration_config.get("app_private_key")
+        organization = ocean.integration_config["github_organization"]
+        github_host = ocean.integration_config["github_host"]
+
+        match client_type:
+            case "rest":
+                if app_id is not None and app_private_key is not None:
+                    logger.info("app_id and private_key detected, using Github App")
+                    if "rest_app" not in self._clients:
+                        decoded_private_key = base64.b64decode(app_private_key)
+                        rest_app = self._clients[
+                            "rest_app"
+                        ] = await GithubAppRestClient(
+                            organization, github_host, app_id, decoded_private_key
+                        ).set_up()
+                        return rest_app
+                    else:
+                        return self._clients["rest_app"]
+                elif token is not None:
+                    logger.info(
+                        "Github token found, using Rest Client with Token authentication"
+                    )
+                    if "rest_token" not in self._clients:
+                        token_app = self._clients["rest_token"] = GithubRestClient(
+                            token,
+                            organization=organization,
+                            github_host=organization,
+                        )
+                        return token_app
+                    else:
+                        return self._clients["rest_token"]
+                raise ValueError(
+                    "app_id and app_private_key must be passed in if github_token is not being used."
                 )
-            else:
-                logger.error(f"Invalid client type: {client_type}")
-                raise ValueError(f"Invalid client type: {client_type}")
-        return self._clients[client_type]
+            case _:
+                raise ValueError("Unknown client type")
 
 
-def create_github_client(client_type: str = "rest") -> AbstractGithubClient:
+async def create_github_client(client_type: str = "rest") -> AbstractGithubClient:
     factory = GithubClientFactory()
-    return factory.get_client(client_type)
+    return await factory.get_client(client_type)
