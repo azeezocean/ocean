@@ -18,6 +18,7 @@ class ObjectKind(StrEnum):
     FEATURE_FLAG = "flag"
     ENVIRONMENT = "environment"
     FEATURE_FLAG_STATUS = "flag-status"
+    FLAG_DEPENDENCIES = "flag-dependencies"
 
 
 class LaunchDarklyClient:
@@ -228,6 +229,116 @@ class LaunchDarklyClient:
             endpoint=f"webhooks/{webhook_id}", method="PATCH", json_data=patch_data
         )
         logger.info(f"Successfully patched webhook {webhook_id} with secret")
+
+    async def get_feature_flag_dependencies(
+        self, projectKey: str, featureFlagKey: str
+    ) -> dict[str, Any]:
+        """Get dependencies for a specific feature flag.
+        
+        This uses the beta API endpoint for flag dependencies.
+        
+        Returns:
+            A dictionary containing:
+            - dependencies: List of flags this flag depends on
+            - dependentFlagConfigs: List of flags that depend on this flag
+        """
+        endpoint = f"flag-dependencies/{projectKey}/{featureFlagKey}"
+        try:
+            return await self.send_api_request(endpoint=endpoint)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.warning(f"No dependencies found for {projectKey}/{featureFlagKey}")
+                return {"dependencies": [], "dependentFlagConfigs": []}
+            raise
+
+    async def get_paginated_flag_dependencies(
+        self,
+    ) -> AsyncGenerator[list[dict[str, Any]], None]:
+        """Get dependencies for all feature flags across all projects."""
+        async for projects in self.get_paginated_projects():
+            for project in projects:
+                project_key = project["key"]
+                feature_flags = []
+                async for flags_batch in self.get_paginated_resource(
+                    ObjectKind.FEATURE_FLAG, resource_path=project_key
+                ):
+                    feature_flags.extend(flags_batch)
+                
+                # Process in batches to avoid too many concurrent requests
+                batch_size = 10
+                for i in range(0, len(feature_flags), batch_size):
+                    batch = feature_flags[i:i+batch_size]
+                    tasks = [
+                        self.fetch_flag_dependencies(project_key, flag["key"])
+                        for flag in batch
+                    ]
+                    
+                    dependencies_batches = await asyncio.gather(*tasks)
+                    # Flatten the list of lists and filter out empty lists
+                    dependencies = []
+                    for deps in dependencies_batches:
+                        dependencies.extend(deps)
+                    
+                    if dependencies:  # Only yield non-empty dependency lists
+                        yield dependencies
+
+    async def fetch_flag_dependencies(
+        self, projectKey: str, featureFlagKey: str
+    ) -> list[dict[str, Any]]:
+        """Fetch dependencies for a specific flag and format them for Port."""
+        try:
+            dependencies = await self.get_feature_flag_dependencies(projectKey, featureFlagKey)
+            
+            # Format the dependencies data
+            formatted_dependencies = []
+            
+            # Process flags that depend on this flag
+            for dependent in dependencies.get("dependentFlagConfigs", []):
+                formatted_dependencies.append({
+                    "flagKey": featureFlagKey,
+                    "dependentFlagKey": dependent["key"],
+                    "dependentFlagName": dependent.get("name", dependent["key"]),
+                    "projectKey": projectKey,
+                    "dependentProjectKey": dependent["projectKey"],
+                    "relationshipType": "is_depended_on_by",
+                    "__projectKey": projectKey,
+                })
+                
+            # Process flags that this flag depends on
+            for dependency in dependencies.get("dependencies", []):
+                formatted_dependencies.append({
+                    "flagKey": featureFlagKey,
+                    "dependentFlagKey": dependency["key"],
+                    "dependentFlagName": dependency.get("name", dependency["key"]),
+                    "projectKey": projectKey,
+                    "dependentProjectKey": dependency["projectKey"],
+                    "relationshipType": "depends_on",
+                    "__projectKey": projectKey,
+                })
+                
+            return formatted_dependencies
+        except Exception as e:
+            logger.error(f"Error fetching dependencies for {projectKey}/{featureFlagKey}: {e}")
+            return []
+
+    async def get_feature_flag_status_with_dependencies(
+        self, projectKey: str, featureFlagKey: str
+    ) -> dict[str, Any]:
+        """Get feature flag status with dependency information."""
+        status = await self.get_feature_flag_status(projectKey, featureFlagKey)
+        try:
+            dependencies = await self.get_feature_flag_dependencies(projectKey, featureFlagKey)
+            status["dependencies"] = dependencies.get("dependencies", [])
+            status["dependentFlags"] = dependencies.get("dependentFlagConfigs", [])
+            status["dependencyCount"] = len(dependencies.get("dependencies", []))
+            status["dependentCount"] = len(dependencies.get("dependentFlagConfigs", []))
+        except Exception as e:
+            logger.error(f"Error fetching dependencies for {projectKey}/{featureFlagKey}: {e}")
+            status["dependencies"] = []
+            status["dependentFlags"] = []
+            status["dependencyCount"] = 0
+            status["dependentCount"] = 0
+        return status
 
     async def create_launchdarkly_webhook(self, base_url: str) -> None:
         """Create or update a webxhook in LaunchDarkly."""
