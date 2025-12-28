@@ -49,6 +49,14 @@ async def on_resync_feature_flag_statuses(kind: str) -> ASYNC_GENERATOR_RESYNC_T
         yield feature_flag_status
 
 
+@ocean.on_resync(kind=ObjectKind.FLAG_DEPENDENCIES)
+async def on_resync_flag_dependencies(kind: str) -> ASYNC_GENERATOR_RESYNC_TYPE:
+    client = LaunchDarklyClient.create_from_ocean_configuration()
+    async for dependencies in client.get_paginated_flag_dependencies():
+        logger.info(f"Received {kind} batch with {len(dependencies)} items")
+        yield dependencies
+
+
 @ocean.on_start()
 async def on_start() -> None:
     logger.info("Starting Port Ocean LaunchDarkly integration")
